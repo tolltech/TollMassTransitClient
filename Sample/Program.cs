@@ -1,36 +1,31 @@
 ﻿using System;
 using System.Threading.Tasks;
-using MassTransit;
+using Tolltech.MassTransitClient;
 
 namespace Tolltech.Sample
 {
     class Program
     {
-        public class Message
-        { 
-            public string Text { get; set; }
-        }
-
         static async Task Main(string[] args)
         {
-            var bus = Bus.Factory.CreateUsingRabbitMq(sbc =>
+            var bus = new MassTransitRabbitMqBus("rabbitmq://localhost");
+
+            //todo: можно контейнером достать
+            var concatStringConsumer = new ConcatStringConsumer();
+
+            bus.AddConsumer(concatStringConsumer);
+
+            await bus.Start();
+
+            string str = null;
+            while (str != "exit")
             {
-                sbc.Host("rabbitmq://localhost");
+                str = Console.ReadLine();
 
-                sbc.ReceiveEndpoint("test_queue", ep =>
-                {
-                    ep.Handler<Message>(context => Console.Out.WriteLineAsync($"Received: {context.Message.Text}"));
-                });
-            });
+                await bus.Publish(new ConcatStringEvent {Value = str});
+            }
 
-            await bus.StartAsync(); // This is important!
-
-            await bus.Publish(new Message{Text = "Hi"});
-        
-            Console.WriteLine("Press any key to exit");
-            Console.ReadKey();
-        
-            await bus.StopAsync();
+            await bus.Stop();
         }
     }
 }
